@@ -18,7 +18,7 @@ Currently "const" in an expression is a prefix used for some const expressions (
 
 This makes `const []` a compile-time constant, and `[]` without the leading "const" is not a constant.
 Since compound compile time constants' sub-expressions (list elements, map keys and values, constructor parameters) must also be compile-time constant expressions, this means that a list of lists must be written `const [const [42, 37], const [87, 23]]`.
-The inner "const" are required by the language specification, but they don't actually provide any extra information because a non-const list in the same position is not allowed by the language syntax. The extra occurrences of `const` are redundant.
+The inner "const" are required by the language specification, but they don't actually provide any extra information because a non-const list in the same position is not allowed by the language. The extra occurrences of `const` are redundant.
 
 This proposal makes these redundant inner `const` optional, so you can write: `const [[42, 37], [87, 23]]` without extra unnecessary `const` prefixes. This solves [Issue 4046][].
 
@@ -31,11 +31,11 @@ Inside a const context, some expressions are interpreted differently than they w
 
 * Any list literal `<T>[...]` (with or without type parameter) in a const context is a const list literal, with the same meaning as the current `const <T>[...]` syntax.
 * Any map literal `<K,V>{...}` (with or without type parameters) in a const context is a const map literal, with the same meaning as the current `const <K,V>{...}`.
-* Any const constructor invocation without a `const`, whether `Foo<T>(...)`, `Foo<T>.bar(...)`, or `prefix.Foo<T>.bar(...)` (with ot without type parameters) where `Foo`/`Foo.bar` are const constructors, has the same meaning as the current `const Foo<T>(...)`, `const Foo<T>.bar(...)` and `const prefix.Foo<T>.bar(...)` expressions respectively, and all parameter expressions are also in a const context. Any function call that isn't a constructor invocation is still a compile-time error in a const context.
+* Any const constructor invocation without a `const`, whether `Foo<T>(...)`, `Foo<T>.bar(...)`, or `prefix.Foo<T>.bar(...)` (with or without type parameters) where `Foo`/`Foo.bar` are const constructors, has the same meaning as the current `const Foo<T>(...)`, `const Foo<T>.bar(...)` and `const prefix.Foo<T>.bar(...)` expressions respectively, and all parameter expressions are also in a const context. Any function call that isn't a constructor invocation is still a compile-time error in a const context.
 
 These rules can be seen as describing an "automatic const insertion strategy" that can be used to convert the new syntax to the existing syntax without changing the meaning of expressions. It allows omitting "const" from list/map/constructor expression when the expression is already required to be a (potentially) compile-time constant expression.
 
-There is a precedence for the constructor invocation syntax: Annotations use the same syntax prefixed by "@" instead of "const", so "@Foo<T>(42)" is interpreted as "const Foo<T>(42)", as if the invocation was in a const context (except that parameters must still be marked as const).
+There is a precedent for the constructor invocation syntax: Annotations use the same syntax prefixed by "@" instead of "const", so "@Foo<T>(42)" is interpreted as "const Foo<T>(42)", as if the invocation was in a const context (except that parameters must still be marked as const).
 With the "const context" concept introduced, it would be possible to say that annotations are always in a const context introduced by the "@".
 
 ## Syntactic Const Contexts
