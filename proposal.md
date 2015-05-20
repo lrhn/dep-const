@@ -31,9 +31,9 @@ Inside a const context, some expressions are interpreted differently than they w
 
 * Any list literal `<T>[...]` (with or without type parameter) in a const context is a const list literal, with the same meaning as the current `const <T>[...]` syntax.
 * Any map literal `<K,V>{...}` (with or without type parameters) in a const context is a const map literal, with the same meaning as the current `const <K,V>{...}`.
-* Any const constructor invocation without a `const`, whether `Foo<T>(...)`, `Foo<T>.bar(...)`, or `prefix.Foo<T>.bar(...)` (with or without type parameters) where `Foo`/`Foo.bar` are const constructors, has the same meaning as the current `const Foo<T>(...)`, `const Foo<T>.bar(...)` and `const prefix.Foo<T>.bar(...)` expressions respectively, and all parameter expressions are also in a const context. Any function call that isn't a constructor invocation is still a compile-time error in a const context.
+* Any constructor invocation without a `const`, whether `Foo<T>(...)`, `Foo<T>.bar(...)`, or `prefix.Foo<T>.bar(...)` (with or without type parameters) has the same meaning as the current `const Foo<T>(...)`, `const Foo<T>.bar(...)` and `const prefix.Foo<T>.bar(...)` expressions respectively, and all parameter expressions are also in a const context. Any function call that isn't a constructor invocation is still a compile-time error in a const context.
 
-These rules can be seen as describing an "automatic const insertion strategy" that can be used to convert the new syntax to the existing syntax without changing the meaning of expressions. It allows omitting "const" from list/map/constructor expression when the expression is already required to be a (potentially) compile-time constant expression.
+These rules can be seen as describing an "automatic const insertion strategy" that can be used to convert the new syntax to the existing syntax without changing the meaning of expressions. It allows omitting "const" from list/map/constructor expression when the expression is already required to be a compile-time constant expression.
 
 There is a precedent for the constructor invocation syntax: Annotations use the same syntax prefixed by "@" instead of "const", so "@Foo<T>(42)" is interpreted as "const Foo<T>(42)", as if the invocation was in a const context (except that parameters must still be marked as const).
 With the "const context" concept introduced, it would be possible to say that annotations are always in a const context introduced by the "@".
@@ -65,6 +65,7 @@ If we can't find a solution, we should probably not make the `const` optional on
 The Dart specification must be updated to allow const constructor invocations without the initial const prefix.
 
 It may be easier to have a separate limited grammar for const expressions, instead of allowing `Foo<int>(42)` everywhere in the grammar, and then declare it a syntax error if the syntax occurs outside of a const context.
+If generic functions are introduced with the same syntax, this problem goes away since the syntax will be valid everywhere.
 
 ### Implementations
 Implementing this proposal requires changes to all Dart parsers to match the changes in the specification.
@@ -74,13 +75,42 @@ In most cases, the necessary changes should be restricted to the parser. Further
 ## Variations
 ### Const Constructor Initializer Lists Generalization
 
-The initializer lists of const constructors can be treated specially: When used to create a compile-time constant, the expressions are treated as in a const context, and when they are used to create a runtime instance, the expressions are treated as non-const (with constructor calls having an implicit "new" instead of the missing "const").
+The initializer lists of const constructors can be treated specially because they can be used both in a compile-time constant way and at runtime.
+
+You could say that the initializer expressions are not in a "const context" but in a "potentially const context", because they allow *potentially* compile-time constant expressions (which includes some uses of the function parameters).
+
+In a potentially const context, an omitted "const" is fixed differently depending on whether the constructor is being called using `new` or `const`.
+
+- When a `const` is omitted, the expression will create a compile-time constant when the constructor is called using `const`, inserting the `const` as above.
+- When the same constructor is called using `new`, the expression is treated as if it was prefixed by `new` (for constructors) or nothing (for list/map literals).
+- The sub-expressions of such an expression will themselves be in a potentially const context, and may be potentially compile-time constant expressions, so they can use the constructor parameters.
+
+If the `const` is not omitted, the expression is a normal compile-time constant expression, and its sub-expressions are in a const context, not a potentially const context.
+
 There is a number of issues related to this: [Issue 20962][], [Issue 22329][]
 
 Even without this improvement, the proposal still makes sense.
 
+However, not including this feature will make it a breaking change to add it later using the same syntax. The constructor:
+
+    const Foo(x) : this.y = Bar(2, 4);
+
+will be equivalent to:
+
+    const Foo(x) : this.y = const Bar(2, 4);
+
+If we later add the "auto new/const" feature, the former constructor would now create different objects when called with `new`, so:
+
+    identical(new Foo(0).y, new Foo(0).y)
+
+would change from `true` to `false`. 
+
+Using an explicit `auto` keyword could avoid that problem.
+
 ### Const Function Expressions
 Top-level and static functions are compile-time constants, but function expressions are not (see [Issue 4596][]). It would be possible to make some function expressions in a const context be compile-time constants (only if they don't refer to any non-static variables - basically if they can be converted to a top-level/static function and the expression replaced by a reference to that function). Since a parameter default value is already in const context, you would be able to write a literal expression directly, solving issue 4596. More generally we could allow "const functionExpression" as an expression, and make the "const" optional in a const context.
+
+See also the [const function proposal][] for this feature by itself.
 
 Even without this improvement, the proposal still makes sense.
 
@@ -92,6 +122,7 @@ TC52, the Ecma technical committee working on evolving the open [Dart standard][
 [Issue 4596]: http://dartbug.com/4596
 [Issue 20962]: http://dartbug.com/20962
 [Issue 22329]: http://dartbug.com/22329
+[const function proposal]: https://github.com/Pajn/dep-const-function-literals/blob/master/proposal.md
 [DEP Proposal Location]: https://github.com/lrhn/dep-const/
 [dart standard]: http://www.ecma-international.org/publications/standards/Ecma-408.htm
 [rfpp]: http://www.ecma-international.org/memento/TC52%20policy/Ecma%20Experimental%20TC52%20Royalty-Free%20Patent%20Policy.pdf
